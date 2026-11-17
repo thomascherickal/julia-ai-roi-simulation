@@ -1,0 +1,261 @@
+        - # Paradigm 3: System Dynamics (SD)
+        - # Macro-level feedback loops (Reinforcing & Balancing), stocks, and flows solved via 4th-order Runge-Kutta (RK4).
+        - # Models compounding AI workflow mastery & proprietary data moat vs. technical debt/verification drag & token cost sprawl.
+        - 
+        - """
+        -     run_system_dynamics_model(config::ScenarioConfig; horizon_months::Int=36, dt::Float64=0.25,
+        -                               reinvestment_rate::Float64=-1.0, governance_damping::Float64=-1.0,
+        -                               automation_ambition::Float64=-1.0)
+        - 
+        - Solves the coupled nonlinear ODE system of 4 macro organizational stocks over `horizon_months` using RK4:
+        - - Stock 1: `A(t)` Adopted Workforce Fraction (0..1)
+        - - Stock 2: `M(t)` Organizational AI Workflow Mastery & Proprietary Data Moat (0..1.5)
+        - - Stock 3: `D(t)` AI Technical Debt & Unverified Rework Backlog (0..1)
+        - - Stock 4: `S(t)` Autonomous Compute & Token Sprawl Multiplier (1.0..4.0)
+        - """
+       20 function run_system_dynamics_model(
+        -     config::ScenarioConfig;
+        -     horizon_months::Int=36,
+        -     dt::Float64=0.25,
+        -     reinvestment_rate::Float64=-1.0,
+        -     governance_damping::Float64=-1.0,
+        -     automation_ambition::Float64=-1.0
+        - )
+       20     total_hc = sum(t.headcount for t in config.teams)
+       20     total_annual_payroll = sum(t.headcount * t.fully_loaded_annual_cost_usd for t in config.teams)
+       10     monthly_payroll = total_annual_payroll / 12.0
+        - 
+        -     # Weighted baseline team attributes
+       20     w_addressable = sum((t.headcount / total_hc) * t.ai_addressable_task_share for t in config.teams)
+       20     w_gross = sum((t.headcount / total_hc) * t.gross_uplift_mode for t in config.teams) * config.uplift_multiplier
+       20     w_rework = sum((t.headcount / total_hc) * t.rework_drag_mode for t in config.teams) * config.rework_multiplier
+       20     w_seat_cost = sum((t.headcount / total_hc) * t.seat_cost_monthly_mode for t in config.teams) * config.seat_cost_multiplier
+       20     w_real = clamp(sum((t.headcount / total_hc) * t.realization_factor_mode for t in config.teams) * config.realization_multiplier, 0.1, 0.98)
+        - 
+        -     # Scenario macro feedback parameters
+       10     reinvest = if reinvestment_rate >= 0.0
+        2         reinvestment_rate
+        8     elseif config.id == "agentic_transformation"
+        2         0.38
+        6     elseif config.id == "pragmatic_phased"
+        2         0.26
+        4     elseif config.id == "conservative_pilot"
+        2         0.22
+        -     else
+       28         0.12 # Blitzscale under-invests in workflow architecture
+        -     end
+        - 
+       10     gov_damp = if governance_damping >= 0.0
+        2         governance_damping
+        8     elseif config.id == "conservative_pilot"
+        2         0.42
+        6     elseif config.id == "pragmatic_phased"
+        2         0.32
+        4     elseif config.id == "agentic_transformation"
+        2         0.35
+        -     else
+       28         0.12 # Blitzscale has weak governance damping on tech debt & token sprawl
+        -     end
+        - 
+       10     ambition = if automation_ambition >= 0.0
+        2         automation_ambition
+        8     elseif config.id == "blitzscale_mandate"
+        2         0.65
+        6     elseif config.id == "agentic_transformation"
+        2         0.55
+        4     elseif config.id == "pragmatic_phased"
+        2         0.40
+        -     else
+       28         0.24
+        -     end
+        - 
+       10     ceiling = config.rollout.ceiling_mode
+       10     upfront_platform = 0.5 * (config.costs.upfront_platform_p10_usd + config.costs.upfront_platform_p90_usd)
+       10     training_per_seat = config.costs.training_per_seat_mode_usd
+        - 
+        -     # Coupled ODE derivative function: dY/dt = f(t, Y)
+        -     # Y = [A, M, D, S]
+     5770     function derivatives(y::Vector{Float64})
+    11520         A = clamp(y[1], 0.01, 0.99)
+    11520         M = clamp(y[2], 0.0, 1.50)
+    11520         D = clamp(y[3], 0.0, 1.00)
+    11520         S = clamp(y[4], 1.0, 5.00)
+        - 
+        -         # Reinforcing Loop R1: Word-of-mouth + management ambition + mastery acceleration
+     5760         inflow_adoption = (0.045 * ambition + 0.32 * A * (1.0 + 0.45 * M)) * max(0.0, ceiling - A)
+        -         # Balancing Loop B1: Tech-debt & hallucination fatigue causing abandonment
+     5760         outflow_churn = 0.16 * D * A * (1.0 - 0.5 * gov_damp)
+     5760         dA = inflow_adoption - outflow_churn
+        - 
+        -         # Reinforcing Loop R2: Learning-by-doing & reinvestment build Workflow Mastery & Data Moat
+     5760         inflow_mastery = (0.055 * reinvest * A + 0.025 * A * (1.0 - D)) * max(0.0, 1.25 - M)
+     5760         outflow_obsolescence = 0.018 * M
+     5760         dM = inflow_mastery - outflow_obsolescence
+        - 
+        -         # Balancing Loop B2: Unverified AI volume builds Tech Debt / Verification Backlog; Governance drains it
+     5760         inflow_debt = 0.085 * ambition * A * (w_rework / 0.06) * max(0.2, 1.0 - 0.65 * M)
+     5760         outflow_remediation = (0.14 + 0.38 * gov_damp + 0.12 * M) * D
+     5760         dD = inflow_debt - outflow_remediation
+        - 
+        -         # Balancing Loop B3: Multi-agent loops & context expansion drive Token Sprawl; FinOps governance caps it
+     5760         inflow_sprawl = 0.048 * ambition * A * S * (1.0 - 0.55 * gov_damp)
+     5760         outflow_finops = 0.065 * gov_damp * (S - 1.0)
+     5760         dS = inflow_sprawl - outflow_finops
+        - 
+     5760         return [dA, dM, dD, dS]
+        -     end
+        - 
+        -     # Initial Stock State at Month 0
+       40     y = [
+        -         config.id == "blitzscale_mandate" ? 0.18 : 0.06, # Initial A(0)
+        -         0.10,                                            # Initial Mastery M(0)
+        -         0.02,                                            # Initial Tech Debt D(0)
+        -         1.00                                             # Initial Token Sprawl S(0)
+        -     ]
+        - 
+       10     steps_per_month = max(1, round(Int, 1.0 / dt))
+       10     eff_dt = 1.0 / steps_per_month
+        - 
+       10     stock_A = Vector{Float64}(undef, horizon_months)
+       10     stock_M = Vector{Float64}(undef, horizon_months)
+       10     stock_D = Vector{Float64}(undef, horizon_months)
+       10     stock_S = Vector{Float64}(undef, horizon_months)
+        - 
+       10     flow_gross_benefit = Vector{Float64}(undef, horizon_months)
+       10     flow_debt_drag = Vector{Float64}(undef, horizon_months)
+       10     flow_compute_cost = Vector{Float64}(undef, horizon_months)
+       10     flow_net_cashflow = Vector{Float64}(undef, horizon_months)
+       10     flow_cum_cashflow = Vector{Float64}(undef, horizon_months)
+       10     loop_dominance_score = Vector{Float64}(undef, horizon_months) # >0 Reinforcing dominates, <0 Balancing dominates
+        - 
+       10     cum_cf = 0.0
+       10     npv_acc = 0.0
+       10     tot_cost = 0.0
+       10     tot_net_ben = 0.0
+       10     tot_gross_ben = 0.0
+       10     tot_debt_drag = 0.0
+       20     monthly_discount_rate = (1.0 + config.costs.annual_discount_rate)^(1.0 / 12.0) - 1.0
+        - 
+       10     for m in 1:horizon_months
+        -         # Integrate 1 month via RK4
+      360         for _ in 1:steps_per_month
+     1440             k1 = derivatives(y)
+     2880             k2 = derivatives(y .+ 0.5 .* eff_dt .* k1)
+     2880             k3 = derivatives(y .+ 0.5 .* eff_dt .* k2)
+     2880             k4 = derivatives(y .+ eff_dt .* k3)
+     2880             y = y .+ (eff_dt / 6.0) .* (k1 .+ 2.0 .* k2 .+ 2.0 .* k3 .+ k4)
+     1440             y[1] = clamp(y[1], 0.01, 0.99)
+     1440             y[2] = clamp(y[2], 0.0, 1.50)
+     1440             y[3] = clamp(y[3], 0.0, 1.00)
+     1440             y[4] = clamp(y[4], 1.0, 5.00)
+     2520         end
+        - 
+      360         A_m, M_m, D_m, S_m = y[1], y[2], y[3], y[4]
+      360         stock_A[m] = round(A_m * 100.0, digits=1)
+      360         stock_M[m] = round(M_m * 100.0, digits=1)
+      360         stock_D[m] = round(D_m * 100.0, digits=1)
+      360         stock_S[m] = round(S_m, digits=2)
+        - 
+        -         # Compounding productivity gain from Mastery (R2) vs. Tech Debt drag (B2)
+      360         mastery_multiplier = 0.70 + 0.65 * M_m
+      360         gross_val_m = monthly_payroll * A_m * w_addressable * w_gross * mastery_multiplier * w_real
+      360         debt_drag_m = monthly_payroll * A_m * (w_addressable * w_rework + 0.14 * D_m) * w_real
+      360         net_ben_m = gross_val_m - debt_drag_m
+        - 
+      680         platform_m = m <= 4 ? 0.25 * upfront_platform : (upfront_platform * config.costs.ongoing_platform_maint_rate) / 12.0
+      630         training_m = m <= 9 ? (training_per_seat * total_hc) / 9.0 : (training_per_seat * total_hc * reinvest * 0.5) / 12.0
+      360         provisioned_seats = total_hc * min(1.0, A_m * 1.15)
+      360         seat_compute_m = provisioned_seats * w_seat_cost * S_m
+      360         cost_m = platform_m + training_m + seat_compute_m
+        - 
+      360         net_cf_m = net_ben_m - cost_m
+      360         cum_cf += net_cf_m
+      720         npv_acc += net_cf_m / ((1.0 + monthly_discount_rate)^m)
+      360         tot_cost += cost_m
+      360         tot_net_ben += net_ben_m
+      360         tot_gross_ben += gross_val_m
+      360         tot_debt_drag += debt_drag_m
+        - 
+      360         flow_gross_benefit[m] = round(gross_val_m, digits=0)
+      360         flow_debt_drag[m] = round(debt_drag_m, digits=0)
+      360         flow_compute_cost[m] = round(cost_m, digits=0)
+      360         flow_net_cashflow[m] = round(net_cf_m, digits=0)
+      360         flow_cum_cashflow[m] = round(cum_cf, digits=0)
+        - 
+        -         # Net reinforcing force vs balancing drag index
+      360         r_force = A_m * mastery_multiplier * 100.0
+      360         b_force = (D_m * 140.0) + (S_m - 1.0) * 35.0
+      360         loop_dominance_score[m] = round(r_force - b_force, digits=1)
+      710     end
+        - 
+       10     roi_pct = ((tot_net_ben - tot_cost) / max(1.0, tot_cost)) * 100.0
+        - 
+       40     causal_loops = [
+        -         Dict{String, Any}(
+        -             "id" => "R1",
+        -             "type" => "Reinforcing (+)",
+        -             "name" => "Peer Contagion & Network Utility Loop",
+        -             "pathway" => "Adopted Workforce (A) → Shared Prompt/Workflow Templates → Higher Peer Utility → Faster Adoption Inflow",
+        -             "impact_summary" => "Accelerates S-curve inflection once active adoption crosses ~25% of headcount."
+        -         ),
+        -         Dict{String, Any}(
+        -             "id" => "R2",
+        -             "type" => "Reinforcing (+)",
+        -             "name" => "Compounding Workflow Mastery & Data Moat Loop",
+        -             "pathway" => "Active Usage (A) + Enablement Reinvestment → Workflow Mastery (M) → Higher Realized Task Uplift & Fewer Errors",
+        -             "impact_summary" => "Multiplies per-seat productivity by $(round(0.70 + 0.65 * (stock_M[end]/100.0), digits=2))x by Month 36."
+        -         ),
+        -         Dict{String, Any}(
+        -             "id" => "B1",
+        -             "type" => "Balancing (-)",
+        -             "name" => "AI Tech Debt & Verification Bottleneck Loop",
+        -             "pathway" => "Rapid Unverified Output → AI Tech Debt Stock (D) → Verification Rework & Outages → User Burnout & Drag",
+        -             "impact_summary" => "Absorbs \$$(round(Int, tot_debt_drag / 1000))k in cumulative rework drag over 36 months."
+        -         ),
+        -         Dict{String, Any}(
+        -             "id" => "B2",
+        -             "type" => "Balancing (-)",
+        -             "name" => "Autonomous Agent Token & Compute Sprawl Loop",
+        -             "pathway" => "Multi-Agent Chains → Token Sprawl Multiplier (S) → Run-Rate Cloud Cost Escalation → Margin Compression",
+        -             "impact_summary" => "Scales per-seat compute multiplier to $(stock_S[end])x by Month 36 unless FinOps governance dampens sprawl."
+        -         )
+        -     ]
+        - 
+       10     return Dict{String, Any}(
+        -         "paradigm" => "system_dynamics",
+        -         "scenario_id" => config.id,
+        -         "scenario_name" => config.name,
+        -         "parameters" => Dict{String, Any}(
+        -             "horizon_months" => horizon_months,
+        -             "rk4_step_months" => eff_dt,
+        -             "reinvestment_rate" => round(reinvest, digits=2),
+        -             "governance_damping" => round(gov_damp, digits=2),
+        -             "automation_ambition" => round(ambition, digits=2)
+        -         ),
+        -         "kpis" => Dict{String, Any}(
+        -             "equilibrium_roi_pct" => round(roi_pct, digits=1),
+        -             "equilibrium_npv_usd" => round(npv_acc, digits=0),
+        -             "total_gross_value_36m_usd" => round(tot_gross_ben, digits=0),
+        -             "total_tech_debt_drag_36m_usd" => round(tot_debt_drag, digits=0),
+        -             "total_cost_36m_usd" => round(tot_cost, digits=0),
+        -             "m36_adopted_workforce_pct" => stock_A[end],
+        -             "m36_workflow_mastery_index" => stock_M[end],
+        -             "m36_tech_debt_index" => stock_D[end],
+        -             "m36_token_sprawl_multiplier" => stock_S[end]
+        -         ),
+        -         "stocks_and_flows" => Dict{String, Any}(
+        -             "months" => collect(1:horizon_months),
+        -             "stock_adopted_workforce_pct" => stock_A,
+        -             "stock_workflow_mastery_index" => stock_M,
+        -             "stock_tech_debt_index" => stock_D,
+        -             "stock_token_sprawl_multiplier" => stock_S,
+        -             "flow_gross_benefit_usd" => flow_gross_benefit,
+        -             "flow_debt_drag_usd" => flow_debt_drag,
+        -             "flow_total_cost_usd" => flow_compute_cost,
+        -             "flow_net_cashflow_usd" => flow_net_cashflow,
+        -             "flow_cumulative_cashflow_usd" => flow_cum_cashflow,
+        -             "loop_dominance_score" => loop_dominance_score
+        -         ),
+        -         "causal_loops" => causal_loops
+        -     )
+        - end

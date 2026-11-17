@@ -1,0 +1,74 @@
+name: Build AI ROI Monte Carlo Scenarios & Deploy
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+  schedule:
+    # Weekly scheduled recomputation every Monday at 06:00 UTC
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      n_trials:
+        description: "Number of Monte Carlo trials per scenario"
+        required: false
+        default: "10000"
+        type: string
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages-and-sim-${{ github.ref }}"
+  cancel-in-progress: false
+
+jobs:
+  simulate-and-test:
+    name: Run Julia Monte Carlo Model & Export Static JSON
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Julia
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.10"
+
+      - name: Cache Julia artifacts
+        uses: julia-actions/cache@v2
+
+      - name: Run unit & statistical invariants tests
+        run: julia --project=. test/runtests.jl
+
+      - name: Precompute scenarios and generate Static JSON
+        run: julia --project=. scripts/generate_scenarios.jl
+
+      - name: Validate generated JSON files
+        run: |
+          python3 -m json.tool web/data/scenarios.json > /dev/null
+          for f in web/data/*.json; do
+            echo "Validated $f ($(wc -c < "$f") bytes)"
+          done
+
+      - name: Upload Static Site & Precomputed JSON Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./web
+
+  deploy-pages:
+    name: Publish Scenario Explorer to GitHub Pages
+    if: github.event_name != 'pull_request'
+    needs: simulate-and-test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+

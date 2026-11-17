@@ -1,0 +1,69 @@
+# Shared Domain Types for Multi-Paradigm AI Adoption ROI Simulation
+
+struct TeamArchetype
+    id::String
+    name::String
+    headcount::Int
+    fully_loaded_annual_cost_usd::Float64
+    ai_addressable_task_share::Float64
+    # Triangular(min, mode, max) for gross productivity uplift on AI-addressable tasks
+    gross_uplift_min::Float64
+    gross_uplift_mode::Float64
+    gross_uplift_max::Float64
+    # Triangular(min, mode, max) for verification, hallucination & rework drag
+    rework_drag_min::Float64
+    rework_drag_mode::Float64
+    rework_drag_max::Float64
+    # Base monthly license + token cost per active seat (Triangular)
+    seat_cost_monthly_min::Float64
+    seat_cost_monthly_mode::Float64
+    seat_cost_monthly_max::Float64
+    # Value capture factor: fraction of net hours saved translated into P&L value
+    realization_factor_min::Float64
+    realization_factor_mode::Float64
+    realization_factor_max::Float64
+end
+
+struct RolloutProfile
+    ceiling_min::Float64
+    ceiling_mode::Float64
+    ceiling_max::Float64
+    inflection_month_min::Float64
+    inflection_month_mode::Float64
+    inflection_month_max::Float64
+    steepness_min::Float64
+    steepness_mode::Float64
+    steepness_max::Float64
+    dip_depth_min::Float64
+    dip_depth_mode::Float64
+    dip_depth_max::Float64
+end
+
+struct CostDynamics
+    upfront_platform_p10_usd::Float64
+    upfront_platform_p90_usd::Float64
+    training_per_seat_min_usd::Float64
+    training_per_seat_mode_usd::Float64
+    training_per_seat_max_usd::Float64
+    token_drift_annual_min::Float64
+    token_drift_annual_mode::Float64
+    token_drift_annual_max::Float64
+    ongoing_platform_maint_rate::Float64
+    annual_discount_rate::Float64
+end
+
+struct ScenarioConfig
+    id::String
+    name::String
+    tagline::String
+    description::String
+    board_recommendation::String
+    rollout::RolloutProfile
+    costs::CostDynamics
+    uplift_multiplier::Float64
+    rework_multiplier::Float64
+    realization_multiplier::Float64
+    seat_cost_multiplier::Float64
+    teams::Vector{TeamArchetype}
+end
+

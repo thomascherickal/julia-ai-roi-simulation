@@ -1,0 +1,32 @@
+        - using Test
+        - using Random
+        - using Statistics
+        - 
+        - include(joinpath(@__DIR__, "..", "src", "AIROISimulator.jl"))
+        - using .AIROISimulator
+        - 
+        1 @testset "AIROISimulator Comprehensive 5-Paradigm Test Suite" begin
+        2     include("test_core.jl")
+        1     include("test_monte_carlo.jl")
+        1     include("test_agent_based.jl")
+        1     include("test_system_dynamics.jl")
+        1     include("test_discrete_event.jl")
+        1     include("test_bayesian_network.jl")
+        - 
+        -     @testset "Full Multi-Paradigm Suite Integration (`run_all_scenarios`)" begin
+        2         bundle = run_multi_paradigm_suite(n_trials=300, n_abm_reps=20, horizon_months=36, base_seed=42)
+        1         @test bundle["schema_version"] == "2.0.0"
+        1         @test length(bundle["paradigms_metadata"]) == 5
+        1         @test length(bundle["scenarios"]) == 4
+        - 
+        1         for sc in bundle["scenarios"]
+        8             @test haskey(sc, "paradigms")
+        8             @test haskey(sc["paradigms"], "monte_carlo")
+        8             @test haskey(sc["paradigms"], "agent_based")
+        8             @test haskey(sc["paradigms"], "system_dynamics")
+        8             @test haskey(sc["paradigms"], "discrete_event")
+        8             @test haskey(sc["paradigms"], "bayesian_network")
+        4             @test length(sc["cross_paradigm_comparison"]) == 5
+        4         end
+        -     end
+        - end

@@ -1,0 +1,121 @@
+        - # Shared Mathematical & Statistical Utilities
+        - 
+        - """
+        -     sample_triangular(rng::AbstractRNG, a::Float64, b::Float64, c::Float64)
+        - 
+        - Sample from a Triangular distribution with minimum `a`, mode `b`, and maximum `c`.
+        - """
+   119902 function sample_triangular(rng::AbstractRNG, a::Float64, b::Float64, c::Float64)::Float64
+   119902     if c <= a
+        2         return a
+        -     end
+   239800     b_clamped = clamp(b, a, c)
+   119900     u = rand(rng)
+   119900     fc = (b_clamped - a) / (c - a)
+   119900     if u < fc
+    50746         return a + sqrt(u * (c - a) * (b_clamped - a))
+        -     else
+    69154         return c - sqrt((1.0 - u) * (c - a) * (c - b_clamped))
+        -     end
+        - end
+        - 
+        - """
+        -     sample_lognormal_from_ci(rng::AbstractRNG, p10::Float64, p90::Float64)
+        - 
+        - Sample from a LogNormal distribution parameterized by its 10th and 90th percentiles (`p10` and `p90`).
+        - """
+     7500 function sample_lognormal_from_ci(rng::AbstractRNG, p10::Float64, p90::Float64)::Float64
+     7500     z90 = 1.2815515655446004
+     7500     lp10 = log(max(p10, 1e-6))
+     7500     lp90 = log(max(p90, 1e-6))
+     7500     mu = 0.5 * (lp10 + lp90)
+     7500     sigma = max(0.0, (lp90 - lp10) / (2.0 * z90))
+     7500     return exp(mu + sigma * randn(rng))
+        - end
+        - 
+        - """
+        -     logistic_adoption(t::Int, ceiling::Float64, t0::Float64, k::Float64)
+        - 
+        - Computes the S-curve adoption fraction at month `t`.
+        - """
+        3 @inline function logistic_adoption(t::Int, ceiling::Float64, t0::Float64, k::Float64)::Float64
+   749163     raw = 1.0 / (1.0 + exp(-k * (Float64(t) - t0)))
+   749163     return ceiling * raw
+        - end
+        - 
+        - """
+        -     j_curve_dip(t::Int, t0::Float64, dip_depth::Float64)
+        - 
+        - Models temporary onboarding/workflow friction that peaks around `t0 - 2.5` and decays.
+        - """
+        2 @inline function j_curve_dip(t::Int, t0::Float64, dip_depth::Float64)::Float64
+   748802     center = max(2.0, t0 - 2.5)
+   748802     width = 3.2
+   748802     z = (Float64(t) - center) / width
+   748802     return dip_depth * exp(-0.5 * z * z)
+        - end
+        - 
+        - """
+        -     quantile_summary(v::AbstractVector{Float64}; digits::Int=1)
+        - 
+        - Returns a standard dictionary of P05, P10, P25, P50, P75, P90, P95, mean, and std.
+        - """
+     1142 function quantile_summary(v::AbstractVector{Float64}; digits::Int=1)
+      571     return Dict{String, Any}(
+        -         "p05" => round(quantile(v, 0.05), digits=digits),
+        -         "p10" => round(quantile(v, 0.10), digits=digits),
+        -         "p25" => round(quantile(v, 0.25), digits=digits),
+        -         "p50" => round(quantile(v, 0.50), digits=digits),
+        -         "p75" => round(quantile(v, 0.75), digits=digits),
+        -         "p90" => round(quantile(v, 0.90), digits=digits),
+        -         "p95" => round(quantile(v, 0.95), digits=digits),
+        -         "mean" => round(mean(v), digits=digits),
+        -         "std" => round(std(v), digits=digits)
+        -     )
+        - end
+        - 
+        - """
+        -     matrix_quantiles(mat::Matrix{Float64}; digits::Int=1)
+        - 
+        - Computes column-wise P10, P25, P50, P75, P90, and mean across trials for each time step.
+        - """
+      282 function matrix_quantiles(mat::Matrix{Float64}; digits::Int=1)
+      141     horizon = size(mat, 2)
+      141     return Dict{String, Any}(
+        -         "p10" => [round(quantile(view(mat, :, m), 0.10), digits=digits) for m in 1:horizon],
+        -         "p25" => [round(quantile(view(mat, :, m), 0.25), digits=digits) for m in 1:horizon],
+        -         "p50" => [round(quantile(view(mat, :, m), 0.50), digits=digits) for m in 1:horizon],
+        -         "p75" => [round(quantile(view(mat, :, m), 0.75), digits=digits) for m in 1:horizon],
+        -         "p90" => [round(quantile(view(mat, :, m), 0.90), digits=digits) for m in 1:horizon],
+        -         "mean" => [round(mean(view(mat, :, m)), digits=digits) for m in 1:horizon]
+        -     )
+        - end
+        - 
+        - """
+        -     build_histogram(data::AbstractVector{Float64}, n_bins::Int, min_val::Float64, max_val::Float64)
+        - 
+        - Constructs a binned histogram dictionary for static JSON plotting.
+        - """
+       22 function build_histogram(data::AbstractVector{Float64}, n_bins::Int, min_val::Float64, max_val::Float64)
+       22     lo = min(min_val, minimum(data))
+       22     hi = max(max_val, maximum(data))
+       22     if hi <= lo
+        1         hi = lo + 1.0
+        -     end
+       22     step = (hi - lo) / n_bins
+       22     edges = [round(lo + i * step, digits=1) for i in 0:n_bins]
+       22     mids = [round(lo + (i + 0.5) * step, digits=1) for i in 0:(n_bins - 1)]
+      575     counts = zeros(Int, n_bins)
+       22     n = length(data)
+       22     for x in data
+    21023         idx = clamp(floor(Int, (x - lo) / step) + 1, 1, n_bins)
+    10520         counts[idx] += 1
+    10520     end
+       22     densities = [round((c / n) * 100.0, digits=2) for c in counts]
+       22     return Dict{String, Any}(
+        -         "bin_edges" => edges,
+        -         "bin_midpoints" => mids,
+        -         "counts" => counts,
+        -         "pct_of_trials" => densities
+        -     )
+        - end

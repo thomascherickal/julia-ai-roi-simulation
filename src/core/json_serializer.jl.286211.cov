@@ -1,0 +1,109 @@
+        - # Deterministic Zero-Dependency JSON Serializer
+        - 
+        6 function escape_json_string(s::AbstractString)
+        6     io = IOBuffer()
+        6     print(io, '"')
+       12     for c in s
+       49         if c == '"'
+        1             print(io, "\\\"")
+       48         elseif c == '\\'
+        1             print(io, "\\\\")
+       47         elseif c == '\n'
+        1             print(io, "\\n")
+       46         elseif c == '\r'
+        1             print(io, "\\r")
+       45         elseif c == '\t'
+        1             print(io, "\\t")
+        -         else
+       44             print(io, c)
+        -         end
+       92     end
+        6     print(io, '"')
+        6     return String(take!(io))
+        - end
+        - 
+        1 function to_json(io::IO, val::Nothing, indent::Int=0)
+        2     print(io, "null")
+        - end
+        - 
+        2 function to_json(io::IO, val::Bool, indent::Int=0)
+        4     print(io, val ? "true" : "false")
+        - end
+        - 
+        2 function to_json(io::IO, val::Integer, indent::Int=0)
+        8     print(io, val)
+        - end
+        - 
+        3 function to_json(io::IO, val::AbstractFloat, indent::Int=0)
+        8     if isnan(val) || isinf(val)
+        2         print(io, "null")
+        -     else
+        1         print(io, val)
+        -     end
+        - end
+        - 
+        - function to_json(io::IO, val::AbstractString, indent::Int=0)
+        3     print(io, escape_json_string(val))
+        - end
+        - 
+        2 function to_json(io::IO, val::Symbol, indent::Int=0)
+        2     to_json(io, String(val), indent)
+        - end
+        - 
+        7 function to_json(io::IO, val::AbstractVector, indent::Int=0)
+        7     if isempty(val)
+        1         print(io, "[]")
+        1         return
+        -     end
+        9     if all(x -> isa(x, Real), val) && length(val) <= 45
+        2         print(io, "[")
+        2         for (i, x) in enumerate(val)
+        5             i > 1 && print(io, ", ")
+        5             to_json(io, x, 0)
+        8         end
+        2         print(io, "]")
+        2         return
+        -     end
+        1     println(io, "[")
+        1     next_indent = indent + 2
+        1     pad = " "^next_indent
+        1     for (i, x) in enumerate(val)
+        2         print(io, pad)
+        2         to_json(io, x, next_indent)
+        2         if i < length(val)
+        1             println(io, ",")
+        -         else
+        1             println(io)
+        -         end
+        3     end
+        1     print(io, " "^indent, "]")
+        - end
+        - 
+        3 function to_json(io::IO, val::AbstractDict, indent::Int=0)
+        3     if isempty(val)
+        1         print(io, "{}")
+        1         return
+        -     end
+        1     println(io, "{")
+        1     next_indent = indent + 2
+        1     pad = " "^next_indent
+        1     keys_sorted = sort!(collect(keys(val)), by=string)
+        1     for (i, k) in enumerate(keys_sorted)
+        2         print(io, pad, escape_json_string(string(k)), ": ")
+        2         to_json(io, val[k], next_indent)
+        2         if i < length(keys_sorted)
+        1             println(io, ",")
+        -         else
+        1             println(io)
+        -         end
+        3     end
+        1     print(io, " "^indent, "}")
+        - end
+        - 
+        1 function write_json(path::AbstractString, data)
+        1     mkpath(dirname(path))
+        1     open(path, "w") do io
+        1         to_json(io, data, 0)
+        1         println(io)
+        -     end
+        - end
