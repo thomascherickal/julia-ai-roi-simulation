@@ -1096,7 +1096,40 @@ function initMarkdownModalAndHeartbeat() {
   }
 }
 
+function initThemeToggle() {
+  const applyTheme = (theme) => {
+    const isDark = theme === "dark";
+    document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.style.colorScheme = theme;
+    const btn = document.getElementById("theme-toggle-btn");
+    if (btn) {
+      btn.setAttribute("aria-pressed", isDark ? "true" : "false");
+      btn.setAttribute("aria-label", isDark ? "Switch to light mode" : "Switch to dark mode");
+      btn.textContent = isDark ? "☀️ Light Mode" : "🌙 Dark Mode";
+    }
+  };
+
+  let saved = "light";
+  try {
+    saved = localStorage.getItem("ai-roi-theme") || "light";
+  } catch (_) {}
+  applyTheme(saved === "dark" ? "dark" : "light");
+
+  const btn = document.getElementById("theme-toggle-btn");
+  if (btn) {
+    btn.addEventListener("click", () => {
+      const current = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+      const next = current === "dark" ? "light" : "dark";
+      applyTheme(next);
+      try {
+        localStorage.setItem("ai-roi-theme", next);
+      } catch (_) {}
+    });
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  initThemeToggle();
   initExecutiveTooltips();
   initMarkdownModalAndHeartbeat();
 });
